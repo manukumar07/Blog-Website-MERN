@@ -1,8 +1,7 @@
 const mongoose = require("mongoose");
 // const dotenv = require("dotenv");
 
-const DB =
-  "mongodb+srv://palmanukumar53:GCwHJFph7ia9EcYE@cluster0.lejte5i.mongodb.net/";
+const DB = "";
 // const DB = process.env.MONGODB_URL; // env file db link
 
 const connectDb = async () => {
