@@ -1,32 +1,46 @@
 // login
 
 const Joi = require("joi"); // for validation use
+const User = require("../models/user");
+const bcrypt = require("bcrypt");
 
-const login = async (req, res) => {
+const login = async (req, res, next) => {
+  // validate input
+  const userLoginSchema = Joi.object({
+    username: Joi.string().min(5).max(20).required(),
+    password: Joi.string()
+      .pattern(new RegExp("^[a-zA-Z0-9]{3,30}$"))
+      .required(),
+  });
+  const { error } = userLoginSchema.validate(req.body);
+  if (error) {
+    return next(error);
+  }
+  const { username, password } = req.body;
+
+  let user;
   try {
-    const { email, password } = req.body;
-
-    const userExist = await User.findOne({ email });
-
-    if (!userExist) {
-      return res.status(400).json({ message: "Invalid credentials" });
+    const user = await User.findOne({ username: username });
+    if (!user) {
+      const error = {
+        status: 401,
+        msg: "Invalid username",
+      };
+      return next(error);
     }
-
-    // const user = await bcrypt.compare(password, userExist.password);
-    const isPasswordValid = await userExist.comparePassword(password);
-
-    if (isPasswordValid) {
-      res.status(200).json({
-        message: "Login Successful",
-        token: await userExist.generateToken(),
-        userId: userExist._id.toString(),
-      });
-    } else {
-      res.status(401).json({ message: "Invalid email or passord " });
+    // to match password
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      const error = {
+        status: 401,
+        msg: "Invalid password",
+      };
+      return next(error);
     }
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    return next(error);
   }
+  return res.status(200).json({ user: user });
 };
 
 //register
@@ -46,29 +60,47 @@ const register = async (req, res) => {
   // return error middleware
 
   if (error) {
+    return next(error);
   }
-  //   try {
-  //   const data = req.body;
-  //     console.log(req.body);
-  //     const { username, email, phone, password } = req.body;
-  //   hash the password  using bcrypt and method and second method in models folder
-  //   const saltRound = 10;
-  //   const hash_password = await bcrypt.hash(password, saltRound);
-  //   await User.create({ username, email, password: hash_password });
-  //     const userExist = await User.findOne({ email: email });
-  //     if (userExist) {
-  //       return res.status(400).json({ msg: "email already exists" });
-  //     }
-  //     const userCreated = await User.create({ username, email, phone, password });
-  //   res.status(201).json({ message: "User registered successfully" });
-  //     res.status(201).json({
-  //       msg: "Registration Successful",
-  //       token: await userCreated.generateToken(),
-  //       userId: userCreated._id.toString(),
-  //     });
-  //   } catch (error) {
-  //     res.status(500).json({ message: "Internal server error" });
-  //   }
+
+  // if email aur username already register
+  const { name, username, email, password } = req.body;
+  try {
+    const emailUse = await User.exits({ email });
+    const usernameUse = await User.exits({ username });
+
+    if (emailUse) {
+      const error = {
+        status: 401,
+        msg: "Email is already registered",
+      };
+      return next(error);
+    }
+    if (usernameUse) {
+      const error = {
+        status: 401,
+        msg: "username is already registered",
+      };
+      return next(error);
+    }
+  } catch (error) {
+    return next(error);
+    // to hash the password using bcrypt
+    const hashPassword = await bcrypt.hash(password, 15);
+    // to store user data in database
+
+    const userRegister = new user({
+      name,
+      username,
+      email,
+      password: hashPassword,
+    });
+
+    const user = await userRegister.save();
+
+    //response send
+    return res.status(201).json({ user });
+  }
 };
 
 module.exports = { login, register };
